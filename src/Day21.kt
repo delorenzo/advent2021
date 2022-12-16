@@ -1,3 +1,4 @@
+import java.math.BigInteger
 import java.util.*
 import kotlin.Comparator
 import kotlin.system.exitProcess
@@ -5,130 +6,95 @@ import kotlin.system.exitProcess
 var PLAYER_ONE_WINS = 0L
 var PLAYER_TWO_WINS = 0L
 fun main() {
-    //partOne(4, 8)
-    //println(rolls)
-    val result = partTwo(mutableMapOf(), GameState(0, 0, 4, 8))
-    println(result)
-    println("1 $PLAYER_ONE_WINS")
-    println("2 $PLAYER_TWO_WINS")
+    val die = listOf(1,2,3)
+    val possibleRolls = die.flatMap { a -> die.flatMap { b-> die.map { c -> listOf(a, b, c) } }}
+    val positions = possibleRolls.map { it.sum() }.groupBy { it }.map { it.key to it.value.size }
+    val wins = calculateWins(4, 21, 5, 21, positions)
+    println(wins)
 }
-//
-//val rolls = listOf(1,1,1).flatMap { a -> listOf(2,2,2).flatMap { b-> listOf(3,3,3).map { c -> listOf(a, b, c) } }}
 
-val rolls = listOf(
-    listOf(1, 1, 1),
-    listOf(1, 1, 2),
-    listOf(1, 1, 3),
-    listOf(1, 2, 1),
-    listOf(1, 2, 2),
-    listOf(1, 2, 3),
-    listOf(1, 3, 1),
-    listOf(1, 3, 2),
-    listOf(1, 3, 3),
-    listOf(2, 1, 1),
-    listOf(2, 1, 2),
-    listOf(2, 1, 3),
-listOf(2, 2, 1),
-listOf(2, 2, 2),
-listOf(2, 2, 3),
-listOf(2, 3, 1),
-listOf(2, 3, 2),
-listOf(2, 3, 3),
-    listOf(3, 1, 1),
-    listOf(3, 1, 2),
-    listOf(3, 1, 3),
-    listOf(3, 2, 1),
-    listOf(3, 2, 2),
-    listOf(3, 2, 3),
-    listOf(3, 3, 1),
-    listOf(3, 3, 2),
-    listOf(3, 3, 3)
-)
+data class Wins(var one: BigInteger = BigInteger.ZERO, var two: BigInteger = BigInteger.ZERO, var totalOne : BigInteger = BigInteger.ZERO, var totalTwo: BigInteger = BigInteger.ZERO)
 
-fun partTwo(memo: MutableMap<Int, Pair<Int, Int>>, state: GameState) : Pair<Int, Int> {
-//    val comparator:  Comparator<GameState> = compareBy {
-//        maxOf(it.oneScore + it.next.second.size, it.twoScore + it.next.second.size)
-//    }
-//    val games = PriorityQueue<GameState>(comparator)
-    //games.add(GameState(0, 0, playerOne, playerTwo, 1 to listOf()))
-    if (state.oneScore >= 21) { return 1 to 0 }
-    if (state.twoScore >= 21) { return 0 to 1 }
-    val m = memo.getOrDefault(state.cache(), 0 to 0)
-    if (m.toList().any { it > 0  }) { return m }
-    var wins = 0 to 0
+fun calculateWins(playerMoving: Int, remainingScoreOne: Int, playerMovingNext: Int, remainingScoreTwo: Int, rolls: List<Pair<Int,Int>>) : Pair<Long, Long> {
+    if (remainingScoreTwo <= 0) { return 0L to 1L }
+
+    var winsOne = 0L
+    var winsTwo = 0L
 
     rolls.forEach {
-        val nextState = state.copy()
-        nextState.onePosition = it.sum()
-        if (nextState.onePosition > 10) { nextState.onePosition %= 10 }
-        if (nextState.onePosition == 0) { nextState.onePosition = 10 }
-        val result = partTwo(memo, GameState(nextState.twoPosition, nextState.twoScore, nextState.onePosition, nextState.oneScore))
-        wins = result.second to result.first
+        val position = (playerMoving + it.first) % 10
+        val remainingScore = remainingScoreOne - 1 - position
+        val result = calculateWins(playerMovingNext, remainingScoreTwo, position, remainingScore, rolls)
+        winsOne += (result.second * it.second)
+        winsTwo += (result.first * it.second)
     }
-    memo[state.cache()] = wins
-    return wins
-//    memo[state] = wins
-//    //for (i in 0 until 5) {
+
+    return winsOne to winsTwo
+}
+
+//fun partTwo(memo: MutableMap<GameState, Wins>, state: GameState, rolls: List<Pair<Int, Int>>) {
+//    val comparator:  Comparator<GameState> = compareBy {
+//        maxOf(it.oneScore, it.twoScore)
+//    }
+//    val games = PriorityQueue(Collections.reverseOrder(comparator))
+//    games.add(GameState(0, 0, 4, 8))
+//
 //    while (!games.isEmpty()) {
 //        val game = games.poll()
-//        if (game.next.first == 1) {
-//            if (game.next.second.size == 3) {
-//                var playerOneMovement = game.next.second.sum()
-//                game.onePosition = (game.onePosition + playerOneMovement)
-//                if (game.onePosition > 10) {
-//                    game.onePosition %= 10
-//                    if (game.onePosition == 0) { game.onePosition = 10 }
-//                }
-//                game.oneScore += game.onePosition
-//                if (game.oneScore >= 21) {
-//                    PLAYER_ONE_WINS++
-//                    println(PLAYER_ONE_WINS)
-//                } else {
-//                    games.add(GameState(game.oneScore,game.twoScore, game.onePosition, game.twoPosition, 2 to listOf()))
-//                }
-//            }
-//            else {
-//                val one = game.next.second.toMutableList()
-//                one.add(1)
-//                val two = game.next.second.toMutableList()
-//                two.add(2)
-//                val three = game.next.second.toMutableList()
-//                three.add(3)
-//                games.add(GameState(game.oneScore, game.twoScore, game.onePosition, game.twoPosition, 1 to one))
-//                games.add(GameState(game.oneScore, game.twoScore, game.onePosition, game.twoPosition, 1 to two))
-//                games.add(GameState(game.oneScore, game.twoScore, game.onePosition, game.twoPosition, 1 to three))
-//            }
+//        if (memo.containsKey(game)) {
+//            val value = memo[game]!!
+//            value.totalOne += value.one
+//            value.totalTwo += value.two
+//            continue
+//            //val value = memo[game]!!
+//            //memo[game] = value.first * rolls.size to value.second * rolls.size
 //        }
-//        else {
-//            if (game.next.second.size == 3) {
-//                var playerTwoMovement = game.next.second.sum()
-//                game.twoPosition = (game.twoPosition + playerTwoMovement)
-//                if (game.twoPosition > 10) {
-//                    game.twoPosition %= 10
-//                    if (game.twoPosition == 0) { game.twoPosition = 10 }
+//
+//        rolls.forEach {
+//            var movement = it
+//            if (game.nextTurn == 1) {
+//                val oneRoll = game.copy()
+//                oneRoll.movePlayerOne(movement.first)
+//                oneRoll.nextTurn = 2
+//                if (oneRoll.oneScore >= 21) {
+//                    val value = memo.getOrDefault(game, Wins())
+//                    value.one += (BigInteger.ONE.times(BigInteger.valueOf(movement.second.toLong())))
+//                    value.totalOne += (BigInteger.ONE.times(BigInteger.valueOf(movement.second.toLong())))
+//                    memo[game] = memo.getOrDefault(game, value)
+//                }  else if (memo.containsKey(oneRoll)) {
+//                    val value = memo[oneRoll]!!
+//                    value.totalOne += value.one
+//                    value.totalTwo += value.two
 //                }
-//                game.twoScore += game.twoPosition
-//                if (game.twoScore >= 21) {
-//                    PLAYER_TWO_WINS++
+//                else {
+//                    games.add(oneRoll)
+//                }
+//            } else {
+//                val twoRoll = game.copy()
+//                twoRoll.movePlayerTwo(movement.first)
+//                twoRoll.nextTurn = 1
+//                if (twoRoll.twoScore >= 21) {
+//                    val value = memo.getOrDefault(game, Wins())
+//                    value.two += (BigInteger.ONE.times(BigInteger.valueOf(movement.second.toLong())))
+//                    value.totalTwo += (BigInteger.ONE.times(BigInteger.valueOf(movement.second.toLong())))
+//                    memo[game] = memo.getOrDefault(game, value)
+//                } else if (memo.containsKey(twoRoll)) {
+//                    val value = memo[twoRoll]!!
+//                    value.totalOne += value.one
+//                    value.totalTwo += value.two
 //                } else {
-//                    games.add(GameState(game.oneScore,game.twoScore, game.onePosition, game.twoPosition, 2 to listOf()))
+//                    games.add(twoRoll)
 //                }
-//            }
-//            else {
-//                val one = game.next.second.toMutableList()
-//                one.add(1)
-//                val two = game.next.second.toMutableList()
-//                two.add(2)
-//                val three = game.next.second.toMutableList()
-//                three.add(3)
-//                games.add(GameState(game.oneScore, game.twoScore, game.onePosition, game.twoPosition, 2 to one))
-//                games.add(GameState(game.oneScore, game.twoScore, game.onePosition, game.twoPosition, 2 to two))
-//                games.add(GameState(game.oneScore, game.twoScore, game.onePosition, game.twoPosition, 2 to three))
 //            }
 //        }
 //    }
-
-}
+//
+//    val oneWins = memo.map { it.value.totalOne }.reduce { acc, bigInteger -> acc + bigInteger } to 1
+//    val twoWins = memo.map { it.value.totalTwo }.reduce { acc, bigInteger -> acc + bigInteger } to 2
+//
+//    println(oneWins)
+//    println(twoWins)
+//}
 
 fun partOne(playerOne: Int, playerTwo: Int) {
     var rolls = 0
@@ -183,7 +149,7 @@ fun partOne(playerOne: Int, playerTwo: Int) {
     }
 }
 
-data class GameState(var oneScore: Int, var twoScore: Int, var onePosition: Int, var twoPosition: Int) {
+data class GameState(var oneScore: Int, var twoScore: Int, var onePosition: Int, var twoPosition: Int, var nextTurn: Int = 1) {
     override fun equals(other: Any?): Boolean {
         if (!(other is GameState)) { return false }
         return oneScore == other.oneScore && twoScore == other.twoScore && onePosition == other.onePosition && twoPosition == other.twoPosition
@@ -191,5 +157,27 @@ data class GameState(var oneScore: Int, var twoScore: Int, var onePosition: Int,
 
     fun cache() : Int {
         return oneScore  * 10 * 31 * 10 + (onePosition-1) * 31 * 10  + (twoScore) * 10 + (twoPosition-1)
+    }
+
+    fun copy() : GameState {
+        return GameState(oneScore, twoScore, onePosition, twoPosition)
+    }
+
+    fun movePlayerOne(movement: Int) {
+        onePosition = (onePosition + movement)
+        if (onePosition > 10) {
+            onePosition %= 10
+            if (onePosition == 0) { onePosition = 10 }
+        }
+        oneScore += onePosition
+    }
+
+    fun movePlayerTwo(movement: Int) {
+        twoPosition = (twoPosition + movement)
+        if (twoPosition > 10) {
+            twoPosition %= 10
+            if (twoPosition == 0) { twoPosition = 10 }
+        }
+        twoScore += twoPosition
     }
 }

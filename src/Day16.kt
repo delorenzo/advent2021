@@ -1,12 +1,29 @@
 import java.io.File
 import java.lang.IllegalArgumentException
 import java.math.BigInteger
-import kotlin.properties.Delegates
 
-//71,48,197,207
 var VERSIONS = 0
+
+val BITSMap = mapOf(
+    '0' to "0000",
+    '1' to "0001",
+    '2' to "0010",
+    '3' to "0011",
+    '4' to "0100",
+    '5' to "0101",
+    '6' to "0110",
+    '7' to "0111",
+    '8' to "1000",
+    '9' to "1001",
+    'A' to "1010",
+    'B' to "1011",
+    'C' to "1100",
+    'D' to "1101",
+    'E' to "1110",
+    'F' to "1111",
+)
 fun main() {
-    val input = File("src/input/input16-16.txt").readLines().map { line -> line.toCharArray().map{
+    val input = File("src/input/input16-1.txt").readLines().map { line -> line.toCharArray().map{
         hexToBit(it.toString())
     }}.flatten().joinToString(separator="")
     println(input)
@@ -22,88 +39,61 @@ fun main() {
     println("Part 1:  $VERSIONS")
     println(ins)
 
-    partTwo(root)
+    val part2 = ArrayDeque<Char>(File("src/input/input16-2.txt").readLines().map { it.toCharArray().toList() }.flatten().flatMap { c: Char ->  BITSMap[c]!!.split("") }.filterNot { it.isEmpty() }.map { it.single() })
+    println(part2.parsePacketRecursive())
 }
 
-fun partTwo(root: Packet) {
-    val queue = ArrayDeque<Packet>()
-    queue.add(root)
-    while (!queue.isEmpty()) {
-        val current = queue.removeLast()
-        when {
-            current.valueInitialized() -> {} // don't do anything.  done!
-            current.children.all { it.valueInitialized() } -> {
-                // compute
-                when (current.typeId) {
-                    0 -> {
-                        current.computedValue = current.children.sumOf { it.computedValue }
-                    }
-                    1 -> {
-                        current.computedValue = current.children.map { it.computedValue }.fold(BigInteger.ONE) { a, b ->
-                            a.times(
-                                b
-                            )
-                        }
-                    }
-                    2 -> {
-                        current.computedValue = current.children.minOf { it.computedValue }
-                    }
-                    3 -> {
-                        current.computedValue = current.children.maxOf { it.computedValue }
-                    }
-                    4 -> {
-                        println("Oops, this is a mistake packet")
-                        current.parent?.children?.remove(current)
-                    }
-                    5 -> {
-                        if (current.children.size != 2) { throw IllegalArgumentException("more than 2 packets for op") }
-                        val compare = current.children.first().computedValue.compareTo(current.children[1].computedValue)
-                        current.computedValue = when (compare) {
-                            1 -> BigInteger.ONE
-                            else -> BigInteger.ZERO
-                        }
-                    }
-                    6 -> {
-                        if (current.children.size != 2) { throw IllegalArgumentException("more than 2 packets for op") }
-                        val compare = current.children.first().computedValue.compareTo(current.children[1].computedValue)
-                        current.computedValue = when (compare) {
-                            -1 -> BigInteger.ONE
-                            else -> BigInteger.ZERO
-                        }
-                    }
-                    7 -> {
-                        if (current.children.size != 2) { throw IllegalArgumentException("more or less than 2 packets for op") }
-                        val compare = current.children.first().computedValue.compareTo(current.children[1].computedValue)
-                        current.computedValue = when (compare) {
-                            0 -> BigInteger.ONE
-                            else -> BigInteger.ZERO
-                        }
-                    }
-                    else -> {
-                        current.parent?.children?.remove(current)
-                    }
+fun ArrayDeque<Char>.parsePacketRecursive() : Pair<Int, Long> {
+    var current = ""
+    val version = ("" + removeFirst() + removeFirst() + removeFirst()).toInt(2)
+    VERSIONS += version
+    println("Version total:  $VERSIONS")
+    val typeId = ("" + removeFirst() + removeFirst() + removeFirst()).toString().toInt(2)
+    println("Version: $version  Type:  $typeId")
+    val subPackets = mutableListOf<Long>()
+    if (typeId == 4) {
+        val literal = mutableListOf<String>()
+        var current = ""
+        while (true) {
+            current += ("" + removeFirst() + removeFirst() + removeFirst() + removeFirst() + removeFirst())
+            literal.add(current.takeLast(5))
+            current = ""
+            if (literal.last().startsWith('0')) break
+        }
+        val literalValue = literal.joinToString ("") { it.takeLast(4) }.toLong(2)
+        subPackets.add(literalValue)
+    } else {
+        when (removeFirst().toString()) {
+            "0" -> {
+                current = ""
+                for (i in 1..15) {  current += removeFirst()  }
+                val length = current.toInt(2)
+                println(length)
+                var subBits = ArrayDeque<Char>()
+                for (i in 1..length) {
+                    subBits += removeFirst()
+                }
+                while (subBits.isNotEmpty()) {
+                    if (subBits.all { it == '0' }) break
+                    val p = subBits.parsePacketRecursive()
+                    subPackets += p.second
                 }
             }
-            else -> {
-                queue.addAll(current.children.filterNot { it.valueInitialized() })
-                queue.add(current)
-            } // back in the queue
+            "1" -> {
+                println("Length type:  1")
+                current = ""
+                for (i in 1..11) {  current += removeFirst()  }
+                val numPackets = current.toInt(2)
+
+                for (i in 0 until numPackets) {
+                    val packet = parsePacketRecursive()
+                    subPackets += packet.second
+                }
+            }
+            else -> throw Exception("No thank you")
         }
     }
-
-    println("Root's value is ${root.computedValue}")
-}
-
-fun operate(instructions: ArrayDeque<String>) {
-    val operators = ArrayDeque<String>()
-    val values = ArrayDeque<String>()
-
-    for (i in instructions) {
-        when (i) {
-            "sum", "x", ">", "<", "=" -> operators.add(i)
-            else ->  values.add(i)
-        }
-    }
+    return version to operate(subPackets, typeId)
 }
 
 fun parsePacket(packet: Packet, input: String, packets: ArrayDeque<Packet>, instructions: ArrayDeque<String>) {
@@ -141,15 +131,6 @@ fun parsePacket(packet: Packet, input: String, packets: ArrayDeque<Packet>, inst
                 val newPacket = Packet(lastIndex, 0,  lastIndex = lastIndex+length, parentIndex = packet.lastIndex, remaining = packet.remaining, parent = packet)
                 packet.children.add(newPacket)
                 packets.add(newPacket)
-//                if (packet.type == 0) {
-//                    val newPacket = Packet(lastIndex, 0,  lastIndex = packet.lastIndex, remaining = packet.remaining, parent = packet)
-//                    packet.children.add(newPacket)
-//                    packets.add(newPacket)
-//                } else {
-//                    val newPacket = Packet(lastIndex, 0,  lastIndex = lastIndex+length, remaining = packet.remaining, parent = packet)
-//                    packet.children.add(newPacket)
-//                    packets.add(newPacket)
-//                }
             }
             "1" -> {
                 println("Length type:  1")
@@ -228,4 +209,59 @@ data class Packet(val startingIndex: Int, val type: Int, val lastIndex: Int = 0,
 
 fun hexToBit(it: String) : String {
     return it.toInt(16).toString(2).padStart(4, '0')
+}
+
+fun operate(current: List<Long>, type: Int) : Long {
+    return when (type) {
+        0 -> {
+            current.sumOf { it }
+        }
+        1 -> {
+            return current.map { it }.fold(1L) { a, b ->
+                a.times(
+                    b
+                )
+            }
+        }
+        2 -> {
+            return current.minOf { it }
+        }
+        3 -> {
+            return current.maxOf { it }
+        }
+        4 -> {
+            return current[0]
+        }
+        5 -> {
+            if (current.size != 2) {
+                throw IllegalArgumentException("more than 2 packets for op")
+            }
+            val compare = current.first().compareTo(current[1])
+            return when (compare) {
+                1 -> 1L
+                else -> 0L
+            }
+        }
+        6 -> {
+            if (current.size != 2) {
+                throw IllegalArgumentException("more than 2 packets for op")
+            }
+            val compare = current.first().compareTo(current[1])
+            return when (compare) {
+                -1 -> 1L
+                else -> 0L
+            }
+        }
+        7 -> {
+            if (current.size != 2) {
+                throw IllegalArgumentException("more than 2 packets for op")
+            }
+            val compare = current.first().compareTo(current[1])
+            return when (compare) {
+                0 -> 1L
+                else -> 0L
+            }
+        }
+        else -> current.first()
+    }
 }
